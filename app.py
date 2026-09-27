@@ -1,4 +1,5 @@
 import os
+import re
 import google.generativeai as genai
 import streamlit as st
 
@@ -9,7 +10,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom Styling for Container
+# Custom Styling
 st.markdown("""
     <style>
     .main { padding: 2rem 1rem; }
@@ -21,7 +22,7 @@ st.markdown("""
 # Header Section
 st.title("🤖 AI Text Generator")
 st.caption("Cloud Computing Assignment | Render Deployment")
-st.info("**Name:** Md. Bayzid | **Student ID:** 2026512816")
+st.info("**Name:** Md. Bayzid Baki | **Student ID:** 2026512816")
 st.divider()
 
 # API Configuration
@@ -38,31 +39,22 @@ user_prompt = st.text_area(
 )
 
 def clean_ai_response(text):
-    """Thinking process ebong internal plan bad diye shudhu final response filter kora"""
+    """Internal thinking, plans, and instructions strictly remove kora"""
     if not text:
         return ""
     
-    # Plan: ba last sentence/paragraph clean kora
+    # Remove lines containing thought/plan patterns
     lines = text.strip().split("\n")
-    final_lines = []
-    skip = False
+    cleaned_lines = []
     
     for line in lines:
-        lower_line = line.lower()
-        if "the user said" in lower_line or lower_line.startswith("plan:"):
+        lower_line = line.lower().strip()
+        # Filter out system thoughts or planning lines
+        if any(keyword in lower_line for keyword in ["the user said", "plan:", "acknowledge the greeting", "ask how i can help"]):
             continue
-        if lower_line.startswith("1.") or lower_line.startswith("2."):
-            # Plan numbered items filter kora (jodi main sentence na hoy)
-            if "acknowledge" in lower_line or "ask how" in lower_line:
-                # Text-er moddhe actual answer thakle seta extract kora
-                if "hello!" in lower_line or "hi!" in lower_line:
-                    idx = line.lower().find("hello!")
-                    if idx != -1:
-                        final_lines.append(line[idx:])
-                continue
-        final_lines.append(line)
+        cleaned_lines.append(line)
         
-    result = "\n".join(final_lines).strip()
+    result = "\n".join(cleaned_lines).strip()
     return result if result else text
 
 # Action Button
@@ -72,44 +64,31 @@ if st.button("✨ Generate Response", type="primary"):
     elif user_prompt.strip():
         with st.spinner("🤖 AI is thinking... Please wait..."):
             try:
-                # Get available models
-                models_list = [
+                # Dynamically fetch ALL models supporting generateContent
+                available_models = [
                     m.name for m in genai.list_models()
                     if 'generateContent' in m.supported_generation_methods
                 ]
                 
-                # Filter models to prioritize non-thinking stable versions
-                valid_models = [m for m in models_list if "1.5" in m or "flash" in m]
-                selected_model = valid_models[0] if valid_models else models_list[0]
-                
-                model = genai.GenerativeModel(
-                    selected_model,
-                    system_instruction="You are a polite AI assistant. Output ONLY the final response to the user. Do not include thinking process, reasoning steps, or plans."
-                )
-                
-                response = model.generate_content(user_prompt)
-                raw_text = response.text
-                
-                # Cleaning internal logs/thinking
-                clean_text = clean_ai_response(raw_text)
-                
-                st.subheader("💡 Generated Response")
-                
-                # Modern Chat Message UI
-                with st.chat_message("assistant", avatar="🤖"):
-                    st.write(clean_text)
+                if not available_models:
+                    st.error("No content generation models found for your API key.")
+                else:
+                    # Pick the first available model dynamically (No hardcoded names to avoid 404)
+                    selected_model = available_models[0]
                     
-            except Exception as e:
-                try:
-                    # Fallback model
-                    model = genai.GenerativeModel("gemini-1.5-flash")
-                    response = model.generate_content(user_prompt)
-                    clean_text = clean_ai_response(response.text)
+                    model = genai.GenerativeModel(selected_model)
+                    response = model.generate_content(
+                        f"Provide ONLY the final direct answer to the user. Do not write any thoughts, plans, or reasoning steps.\n\nUser Question: {user_prompt}"
+                    )
+                    
+                    raw_text = response.text if hasattr(response, 'text') else str(response)
+                    final_output = clean_ai_response(raw_text)
                     
                     st.subheader("💡 Generated Response")
                     with st.chat_message("assistant", avatar="🤖"):
-                        st.write(clean_text)
-                except Exception as fallback_error:
-                    st.error(f"Error generating response: {fallback_error}")
+                        st.write(final_output)
+                        
+            except Exception as e:
+                st.error(f"Error generating response: {e}")
     else:
         st.warning("Please enter a prompt before clicking generate.")
