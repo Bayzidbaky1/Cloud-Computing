@@ -9,38 +9,19 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom CSS for UI Enhancement
+# Custom Styling for Container
 st.markdown("""
     <style>
-    .main {
-        padding: 2rem 1rem;
-    }
-    .stTextArea textarea {
-        border-radius: 10px;
-        font-size: 16px;
-    }
-    .response-card {
-        background-color: #1E293B;
-        border-left: 5px solid #3B82F6;
-        padding: 20px;
-        border-radius: 8px;
-        margin-top: 15px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-    .stButton button {
-        border-radius: 8px;
-        font-weight: bold;
-        height: 48px;
-        width: 100%;
-    }
+    .main { padding: 2rem 1rem; }
+    .stTextArea textarea { border-radius: 10px; font-size: 16px; }
+    .stButton button { border-radius: 8px; font-weight: bold; height: 48px; width: 100%; }
     </style>
 """, unsafe_allow_html=True)
 
-# Title & Student Information Header
+# Header Section
 st.title("🤖 AI Text Generator")
 st.caption("Cloud Computing Assignment | Render Deployment")
-
-st.info("**Name:** Md. Bayzid Baki | **Student ID:** 2026512816")
+st.info("**Name:** Md. Bayzid | **Student ID:** 2026512816")
 st.divider()
 
 # API Configuration
@@ -56,6 +37,34 @@ user_prompt = st.text_area(
     height=120
 )
 
+def clean_ai_response(text):
+    """Thinking process ebong internal plan bad diye shudhu final response filter kora"""
+    if not text:
+        return ""
+    
+    # Plan: ba last sentence/paragraph clean kora
+    lines = text.strip().split("\n")
+    final_lines = []
+    skip = False
+    
+    for line in lines:
+        lower_line = line.lower()
+        if "the user said" in lower_line or lower_line.startswith("plan:"):
+            continue
+        if lower_line.startswith("1.") or lower_line.startswith("2."):
+            # Plan numbered items filter kora (jodi main sentence na hoy)
+            if "acknowledge" in lower_line or "ask how" in lower_line:
+                # Text-er moddhe actual answer thakle seta extract kora
+                if "hello!" in lower_line or "hi!" in lower_line:
+                    idx = line.lower().find("hello!")
+                    if idx != -1:
+                        final_lines.append(line[idx:])
+                continue
+        final_lines.append(line)
+        
+    result = "\n".join(final_lines).strip()
+    return result if result else text
+
 # Action Button
 if st.button("✨ Generate Response", type="primary"):
     if not api_key:
@@ -63,42 +72,43 @@ if st.button("✨ Generate Response", type="primary"):
     elif user_prompt.strip():
         with st.spinner("🤖 AI is thinking... Please wait..."):
             try:
-                # Active supported model auto-detection
+                # Get available models
                 models_list = [
                     m.name for m in genai.list_models()
                     if 'generateContent' in m.supported_generation_methods
                 ]
                 
-                # Exclude thinking/experimental raw models to prevent inner plan leaks
-                valid_models = [m for m in models_list if "2.5" not in m and "2.0" not in m]
+                # Filter models to prioritize non-thinking stable versions
+                valid_models = [m for m in models_list if "1.5" in m or "flash" in m]
                 selected_model = valid_models[0] if valid_models else models_list[0]
                 
-                # System Instruction to force direct & clean responses
                 model = genai.GenerativeModel(
                     selected_model,
-                    system_instruction="You are a helpful AI assistant. Provide direct, clean responses. Do not include your internal thinking, chain of thought, or reasoning plan."
+                    system_instruction="You are a polite AI assistant. Output ONLY the final response to the user. Do not include thinking process, reasoning steps, or plans."
                 )
                 
                 response = model.generate_content(user_prompt)
+                raw_text = response.text
                 
-                # Render Clean Output Card
+                # Cleaning internal logs/thinking
+                clean_text = clean_ai_response(raw_text)
+                
                 st.subheader("💡 Generated Response")
-                with st.container():
-                    st.markdown(f'<div class="response-card">', unsafe_allow_html=True)
-                    st.markdown(response.text)
-                    st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Modern Chat Message UI
+                with st.chat_message("assistant", avatar="🤖"):
+                    st.write(clean_text)
                     
             except Exception as e:
-                # Fallback to standard flash model if dynamic fetch fails
                 try:
-                    model = genai.GenerativeModel(
-                        "gemini-1.5-flash",
-                        system_instruction="You are a helpful AI assistant. Provide direct, clean responses without internal thinking steps."
-                    )
+                    # Fallback model
+                    model = genai.GenerativeModel("gemini-1.5-flash")
                     response = model.generate_content(user_prompt)
+                    clean_text = clean_ai_response(response.text)
                     
                     st.subheader("💡 Generated Response")
-                    st.markdown(response.text)
+                    with st.chat_message("assistant", avatar="🤖"):
+                        st.write(clean_text)
                 except Exception as fallback_error:
                     st.error(f"Error generating response: {fallback_error}")
     else:
