@@ -19,7 +19,7 @@ def query_huggingface(prompt):
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "meta-llama/Llama-3.2-1B-Instruct",
+        "model": "Qwen/Qwen2.5-Coder-7B-Instruct",
         "messages": [
             {"role": "user", "content": prompt}
         ],
