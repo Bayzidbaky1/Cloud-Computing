@@ -7,7 +7,7 @@ st.set_page_config(page_title="AI Text Generator", page_icon="🤖")
 
 # Header & Student ID
 st.title("🤖 AI Text Generator")
-st.subheader("Name: Md. Bayzid Baki | Student ID: 2026512816")
+st.subheader("Name: Md. Bayzid  | Student ID: 2026512816")
 
 # Environment Variable theke Gemini API Key read
 api_key = os.environ.get("GEMINI_API_KEY")
