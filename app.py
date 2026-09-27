@@ -1,29 +1,53 @@
 import os
-import google.generativeai as genai
+import requests
 import streamlit as st
 
-# Title & Info
-st.title("AI Text Generator")
-st.subheader("Name: Md. Bayzid Baki | Student ID: [Apnar Student ID Boshann]")
+# Page Configuration
+st.set_page_config(page_title="AI Text Generator", page_icon="🤖")
 
-# Gemini API Key Configure
-api_key = os.environ.get("GEMINI_API_KEY")
-if api_key:
-    genai.configure(api_key=api_key)
+# Title & Student Information
+st.title("🤖 AI Text Generator")
+st.subheader("Name: Md. Bayzid | Student ID: 2026512816")
 
-# User Input
-user_prompt = st.text_input("Enter your prompt / question:")
+# Environment Variable theke Token neowa
+HF_TOKEN = os.environ.get("HF_TOKEN")
+API_URL = "https://router.huggingface.co/hf-inference/v1/chat/completions"
 
-if st.button("Generate"):
-    if not api_key:
-        st.error("API Key paowa jayni! Render Environment Variable check korun.")
-    elif user_prompt:
-        try:
-            model = genai.GenerativeModel("gemini-1.5-flash")
-            response = model.generate_content(user_prompt)
-            st.write("### AI Response:")
-            st.write(response.text)
-        except Exception as e:
-            st.error(f"Error: {e}")
+def query_huggingface(prompt):
+    headers = {
+        "Authorization": f"Bearer {HF_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "meta-llama/Llama-3.2-1B-Instruct",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 300
+    }
+    response = requests.post(API_URL, headers=headers, json=payload)
+    return response.json()
+
+# UI Layout
+user_prompt = st.text_area("Enter your prompt / question:", placeholder="Write something here...")
+
+if st.button("Generate Response", type="primary"):
+    if not HF_TOKEN:
+        st.error("API Token Missing.")
+    elif user_prompt.strip():
+        with st.spinner("AI is thinking..."):
+            try:
+                output = query_huggingface(user_prompt)
+                
+                if "choices" in output and len(output["choices"]) > 0:
+                    reply = output["choices"][0]["message"]["content"]
+                    st.success("Generated Response:")
+                    st.write(reply)
+                elif "error" in output:
+                    st.error(f"Hugging Face Error: {output['error']}")
+                else:
+                    st.write(output)
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
     else:
-        st.warning("Doyakore kichu ekta likhun.")
+        st.warning("Please enter a prompt before clicking generate.")
