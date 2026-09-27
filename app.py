@@ -5,7 +5,7 @@ import streamlit as st
 st.set_page_config(page_title="AI Text Generator", page_icon="🤖")
 
 st.title("🤖 AI Text Generator")
-st.subheader("Name: Md. Bayzid  | Student ID: 2026512816")
+st.subheader("Name: Md. Bayzid | Student ID: 2026512816")
 
 api_key = os.environ.get("GEMINI_API_KEY")
 
@@ -20,7 +20,8 @@ if st.button("Generate Response", type="primary"):
     elif user_prompt.strip():
         with st.spinner("AI is thinking..."):
             try:
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                # Updated model name
+                model = genai.GenerativeModel("gemini-2.0-flash")
                 response = model.generate_content(user_prompt)
                 st.success("Generated Response:")
                 st.write(response.text)
