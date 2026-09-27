@@ -1,5 +1,4 @@
 import os
-import re
 import google.generativeai as genai
 import streamlit as st
 
@@ -10,7 +9,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom Styling
+# Custom Styling for Clean Layout
 st.markdown("""
     <style>
     .main { padding: 2rem 1rem; }
@@ -38,24 +37,18 @@ user_prompt = st.text_area(
     height=120
 )
 
-def clean_ai_response(text):
-    """Internal thinking, plans, and instructions strictly remove kora"""
+def clean_response(text):
+    """Internal thinking process ba plans filter kora"""
     if not text:
         return ""
-    
-    # Remove lines containing thought/plan patterns
     lines = text.strip().split("\n")
-    cleaned_lines = []
-    
+    clean_lines = []
     for line in lines:
-        lower_line = line.lower().strip()
-        # Filter out system thoughts or planning lines
-        if any(keyword in lower_line for keyword in ["the user said", "plan:", "acknowledge the greeting", "ask how i can help"]):
+        lower = line.lower().strip()
+        if any(keyword in lower for keyword in ["the user said", "plan:", "acknowledge the greeting", "ask how i can help"]):
             continue
-        cleaned_lines.append(line)
-        
-    result = "\n".join(cleaned_lines).strip()
-    return result if result else text
+        clean_lines.append(line)
+    return "\n".join(clean_lines).strip()
 
 # Action Button
 if st.button("✨ Generate Response", type="primary"):
@@ -64,31 +57,51 @@ if st.button("✨ Generate Response", type="primary"):
     elif user_prompt.strip():
         with st.spinner("🤖 AI is thinking... Please wait..."):
             try:
-                # Dynamically fetch ALL models supporting generateContent
-                available_models = [
+                # Active supported models fetch kora
+                all_models = [
                     m.name for m in genai.list_models()
                     if 'generateContent' in m.supported_generation_methods
                 ]
                 
-                if not available_models:
-                    st.error("No content generation models found for your API key.")
+                # 404 dewa models (2.5, 2.0, exp) filter out kora
+                safe_models = [
+                    m for m in all_models 
+                    if not any(bad in m for bad in ["2.5", "2.0", "exp", "thinking"])
+                ]
+                
+                # Safe model thakle oita use korbe, na thakle list-er flash/pro search korbe
+                if safe_models:
+                    selected_model = safe_models[0]
                 else:
-                    # Pick the first available model dynamically (No hardcoded names to avoid 404)
-                    selected_model = available_models[0]
+                    selected_model = "models/gemini-1.5-flash"
+                
+                model = genai.GenerativeModel(selected_model)
+                
+                # Direct Answer restrict kora System Prompt inline diye
+                full_prompt = (
+                    "You are a helpful assistant. Output ONLY the final direct response to the user. "
+                    "Do NOT include internal reasoning, thinking, plans, or step-by-step notes.\n\n"
+                    f"User: {user_prompt}"
+                )
+                
+                response = model.generate_content(full_prompt)
+                final_text = clean_response(response.text)
+                
+                st.subheader("💡 Generated Response")
+                with st.chat_message("assistant", avatar="🤖"):
+                    st.write(final_text)
                     
-                    model = genai.GenerativeModel(selected_model)
-                    response = model.generate_content(
-                        f"Provide ONLY the final direct answer to the user. Do not write any thoughts, plans, or reasoning steps.\n\nUser Question: {user_prompt}"
-                    )
-                    
-                    raw_text = response.text if hasattr(response, 'text') else str(response)
-                    final_output = clean_ai_response(raw_text)
+            except Exception as e:
+                # Ultimate fallback to gemini-1.5-flash
+                try:
+                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    response = model.generate_content(f"Answer directly: {user_prompt}")
+                    final_text = clean_response(response.text)
                     
                     st.subheader("💡 Generated Response")
                     with st.chat_message("assistant", avatar="🤖"):
-                        st.write(final_output)
-                        
-            except Exception as e:
-                st.error(f"Error generating response: {e}")
+                        st.write(final_text)
+                except Exception as fallback_err:
+                    st.error(f"Error generating response: {fallback_err}")
     else:
         st.warning("Please enter a prompt before clicking generate.")
